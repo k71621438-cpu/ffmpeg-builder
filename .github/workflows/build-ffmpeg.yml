@@ -61,10 +61,10 @@ jobs:
               --disable-programs --disable-doc --disable-iconv \
               --disable-avdevice --disable-postproc --disable-avfilter \
               --enable-network --enable-swresample --enable-swscale \
-              --enable-protocol=file,pipe,http,https,tcp,udp,rtp,rtsp,hls \
-              --enable-demuxer=rtsp,http,hls,mov,mp4,mkv,matroska,avi,flv,mpegts \
-              --enable-decoder=h264,hevc,vp8,vp9,aac,mp3,opus \
-              --enable-parser=h264,hevc,vp8,vp9,aac,mpegaudio,opus \
+              --enable-protocol=file,pipe,http,https,tcp,udp,rtp,rtsp,rtmps,rtmpe,rtmpt,rtmpte,hls,srt,mms,mmsh,mmst,ftp,ftps \
+              --enable-demuxer=rtsp,http,hls,rtmp,dash,mov,mp4,mkv,matroska,avi,flv,mpegts,mpegps,mjpeg,mpegvideo,flv,wtv \
+              --enable-decoder=h264,hevc,vp8,vp9,aac,mp3,opus,mpeg4,mpeg2video,mpeg1video,mjpeg,mjpegb,h263,h263p \
+              --enable-parser=h264,hevc,vp8,vp9,aac,mpegaudio,opus,mpeg4video,mpegvideo \
               --enable-muxer=mp4,mov,matroska --extra-cflags="-O3 -fPIC" --extra-ldflags=""
             make -j$(nproc) && make install
           }
@@ -86,7 +86,6 @@ jobs:
     needs: build-ffmpeg
     runs-on: ubuntu-latest
     steps:
-      # Checkout your app source code from the other repository
       - name: Checkout App Source (Amkushu999/itsme2)
         uses: actions/checkout@v4
         with:
@@ -94,7 +93,6 @@ jobs:
           token: ${{ secrets.APP_REPO_PAT }}
           path: app-source
 
-      # Download FFmpeg .a files from Job 1
       - name: Download FFmpeg Artifacts
         uses: actions/download-artifact@v4
         with:
