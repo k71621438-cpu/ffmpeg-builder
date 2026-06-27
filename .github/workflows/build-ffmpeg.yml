@@ -1,0 +1,79 @@
+name: Build FFmpeg for Android
+
+on:
+  workflow_dispatch:  # Allows manual triggering from GitHub UI
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential nasm yasm wget unzip
+
+      - name: Download Android NDK
+        run: |
+          wget -q https://dl.google.com/android/repository/android-ndk-r25c-linux-x86_64.zip
+          unzip -q android-ndk-r25c-linux-x86_64.zip
+          echo "NDK=$PWD/android-ndk-r25c" >> $GITHUB_ENV
+
+      - name: Clone FFmpeg
+        run: |
+          git clone --depth 1 --branch n6.1 https://github.com/FFmpeg/FFmpeg.git ffmpeg-src
+          cd ffmpeg-src
+
+      - name: Build FFmpeg for Android (all ABIs)
+        working-directory: ffmpeg-src
+        run: |
+          TOOLCHAIN=$NDK/toolchains/llvm/prebuilt/linux-x86_64
+          API=29
+
+          build_abi() {
+            local ABI=$1 ARCH=$2 CPU=$3 TARGET=$4
+            echo "🔨 Building $ABI..."
+            
+            export AR=$TOOLCHAIN/bin/llvm-ar
+            export CC=$TOOLCHAIN/bin/$TARGET$API-clang
+            export AS=$CC
+            export CXX=$TOOLCHAIN/bin/$TARGET$API-clang++
+            export LD=$TOOLCHAIN/bin/ld
+            export RANLIB=$TOOLCHAIN/bin/llvm-ranlib
+            export STRIP=$TOOLCHAIN/bin/llvm-strip
+
+            make distclean > /dev/null 2>&1 || true
+
+            ./configure \
+              --target-os=android --arch=$ARCH --cpu=$CPU \
+              --nm=$AR --ar=$AR --strip=$STRIP --cc=$CC --cxx=$CXX \
+              --enable-cross-compile --sysroot=$TOOLCHAIN/sysroot \
+              --prefix=$GITHUB_WORKSPACE/output/$ABI \
+              --enable-static --disable-shared \
+              --disable-programs --disable-doc \
+              --disable-avdevice --disable-postproc --disable-avfilter \
+              --enable-network --enable-swresample --enable-swscale \
+              --enable-protocol=file,pipe,http,https,tcp,udp,rtp,rtsp,hls \
+              --enable-demuxer=rtsp,http,hls,mov,mp4,mkv,matroska,avi,flv,mpegts \
+              --enable-decoder=h264,hevc,vp8,vp9,aac,mp3,opus \
+              --enable-parser=h264,hevc,vp8,vp9,aac,mpegaudio,opus \
+              --enable-muxer=mp4,mov,matroska \
+              --extra-cflags="-O3 -fPIC"
+
+            make -j$(nproc)
+            make install
+          }
+
+          build_abi "arm64-v8a"   "aarch64" "armv8-a" "aarch64-linux-android"
+          build_abi "armeabi-v7a" "arm"     "armv7-a" "armv7a-linux-androideabi"
+          build_abi "x86_64"      "x86_64"  "x86_64"  "x86_64-linux-android"
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ffmpeg-android-prebuilt
+          path: output/
+          retention-days: 30
