@@ -1,7 +1,7 @@
 name: Build FFmpeg for Android
 
 on:
-  workflow_dispatch:  # Allows manual triggering from GitHub UI
+  workflow_dispatch:
 
 jobs:
   build:
@@ -18,8 +18,9 @@ jobs:
 
       - name: Download Android NDK
         run: |
-          wget -q https://dl.google.com/android/repository/android-ndk-r25c-linux-x86_64.zip
-          unzip -q android-ndk-r25c-linux-x86_64.zip
+          # FIXED: Google removed '-x86_64' from the filename in newer NDKs
+          wget -q https://dl.google.com/android/repository/android-ndk-r25c-linux.zip
+          unzip -q android-ndk-r25c-linux.zip
           echo "NDK=$PWD/android-ndk-r25c" >> $GITHUB_ENV
 
       - name: Clone FFmpeg
@@ -38,6 +39,8 @@ jobs:
             echo "🔨 Building $ABI..."
             
             export AR=$TOOLCHAIN/bin/llvm-ar
+            # FIXED: Added the correct 'nm' tool (llvm-nm) instead of reusing 'ar'
+            export NM=$TOOLCHAIN/bin/llvm-nm
             export CC=$TOOLCHAIN/bin/$TARGET$API-clang
             export AS=$CC
             export CXX=$TOOLCHAIN/bin/$TARGET$API-clang++
@@ -49,7 +52,7 @@ jobs:
 
             ./configure \
               --target-os=android --arch=$ARCH --cpu=$CPU \
-              --nm=$AR --ar=$AR --strip=$STRIP --cc=$CC --cxx=$CXX \
+              --nm=$NM --ar=$AR --strip=$STRIP --cc=$CC --cxx=$CXX \
               --enable-cross-compile --sysroot=$TOOLCHAIN/sysroot \
               --prefix=$GITHUB_WORKSPACE/output/$ABI \
               --enable-static --disable-shared \
@@ -61,7 +64,8 @@ jobs:
               --enable-decoder=h264,hevc,vp8,vp9,aac,mp3,opus \
               --enable-parser=h264,hevc,vp8,vp9,aac,mpegaudio,opus \
               --enable-muxer=mp4,mov,matroska \
-              --extra-cflags="-O3 -fPIC"
+              --extra-cflags="-O3 -fPIC" \
+              --extra-ldflags=""
 
             make -j$(nproc)
             make install
